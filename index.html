@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSQLite – Web sqlite playground</title>
+    <meta name="description" content="Web compatible sqlite sandbox" />
+    <link rel="stylesheet" href="https://esm.sh/@radix-ui/themes/styles.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @theme {
+        --color-background: #ffffff;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@radix-ui/themes": "https://esm.sh/@radix-ui/themes@3.1.6?deps=react@19.2.0,react-dom@19.2.0",
+          "@sqlite.org/sqlite-wasm": "https://esm.sh/@sqlite.org/sqlite-wasm",
+          "class-variance-authority": "https://esm.sh/class-variance-authority@0.7.0",
+          "clsx": "https://esm.sh/clsx@2.1.0",
+          "lucide-react": "https://esm.sh/lucide-react@0.439.0?deps=react@19.2.0,react-dom@19.2.0",
+          "react": "https://esm.sh/react@19.2.0",
+          "react-dom": "https://esm.sh/react-dom@19.2.0",
+          "react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
+          "react-simple-code-editor": "https://esm.sh/react-simple-code-editor",
+          "prismjs/components/prism-core": "https://esm.sh/prismjs/components/prism-core"
+        }
+      }
+    </script>
+    <script type="module" src="https://esm.sh/tsx"></script>
+  </head>
+
+  <body>
+    <div id="app"></div>
+
+    <script type="text/babel">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+
+      import clsx from 'clsx';
+      import {
+        Theme,
+        Button,
+        Flex,
+        Badge,
+        Box,
+        Container,
+        Tooltip,
+        Table,
+        Callout
+      } from '@radix-ui/themes';
+      import {
+        PlayIcon,
+        Trash2Icon,
+        DatabaseIcon,
+        TriangleAlertIcon
+      } from 'lucide-react';
+      import Editor from 'react-simple-code-editor';
+      import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
+      import prism from 'prismjs/components/prism-core';
+
+      import 'https://esm.sh/prismjs/components/prism-clike';
+      import 'https://esm.sh/prismjs/components/prism-javascript';
+      import 'https://esm.sh/prismjs/components/prism-sql';
+
+      let sqlite3;
+
+      function check() {
+        if (!sqlite3) {
+          throw new ReferenceError(
+            'Missing sqlite3 client. Run initializeSQLite to create one.'
+          );
+        }
+      }
+
+      function run(db, sql) {
+        check();
+
+        try {
+          let data = [];
+          let start = window.performance.now();
+          let res = db.exec({
+            sql,
+            rowMode: 'object',
+            resultRows: data
+          });
+          let elapsed = window.performance.now() - start;
+
+          return { data, elapsed };
+        } catch (err) {
+          console.error('Execution error:', err.name, err.message);
+
+          return { error: err.message ?? err.name };
+        }
+      }
+
+      function create() {
+        check();
+
+        try {
+          console.log('Creating new empty database');
+
+          let db = new sqlite3.oo1.DB();
+
+          console.log('Successfully created database');
+
+          return db;
+        } catch (err) {
+          console.error('Failed to create database', err);
+        }
+      }
+
+      async function initializeSQLite() {
+        if (sqlite3) {
+          return true;
+        }
+
+        const log = console.log;
+        const error = console.error;
+
+        try {
+          log('Loading and initializing SQLite3 module...');
+
+          sqlite3 = await sqlite3InitModule({
+            print: log,
+            printErr: error
+          });
+
+          log('Done initializing.');
+          log('Running SQLite3 version', sqlite3.version.libVersion);
+
+          return true;
+        } catch (err) {
+          error('Initialization error:', err.name, err.message);
+        }
+      }
+
+      function CustomEditor() {
+        let [db, setDB] = React.useState(null);
+        let [code, setCode] = React.useState(
+          `SELECT name FROM sqlite_schema where type = 'table';`
+        );
+        let [result, cacheResult] = React.useState({});
+
+        let lines = code?.split('\n');
+        let isOnline = db !== null;
+
+        let count = Number(result?.data?.length);
+        let empty = count === 0;
+        let headers = !empty
+          ? Object.keys(result?.data?.slice()?.pop() ?? {})
+          : ['Output'];
+        let rows = !empty
+          ? result?.data?.map(row => Object.values(row))
+          : [['No results to show']];
+        let timing = new Intl.NumberFormat('en-US', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2
+        }).format(result?.elapsed);
+
+        React.useEffect(() => {
+          initializeSQLite().then(ready => {
+            setDB(create());
+            console.log(
+              'Database initialization:',
+              ready ? 'Success' : 'Failed'
+            );
+          });
+        }, []);
+
+        return (
+          <Flex gap="4" direction="column">
+            <Tooltip content="Database status">
+              <Badge
+                size="1"
+                radius="full"
+                variant="surface"
+                color={isOnline ? 'green' : 'red'}
+                className="w-fit !font-semibold"
+              >
+                <DatabaseIcon size={8} />
+                {isOnline ? 'online' : 'offline'}
+              </Badge>
+            </Tooltip>
+
+            <Flex className="overflow-y-auto rounded-sm font-mono text-xs bg-gray-50 focus-within:outline focus-within:outline-purple-500/80">
+              <div
+                className="py-1.5 px-2.5 text-right border-r border-r-gray-200"
+                style={{ color: '#888' }}
+              >
+                {lines.map((_, index) => (
+                  <div key={index} style={{ lineHeight: '1.5rem' }}>
+                    {index + 1}
+                  </div>
+                ))}
+              </div>
+
+              <Editor
+                value={code}
+                onValueChange={setCode}
+                highlight={code => prism.highlight(code, prism.languages.sql)}
+                padding={6}
+                className="flex-1 [&>*]:focus-visible:outline-0"
+                style={{
+                  fontFamily: '"Monaspace Neon", Courier, monospace',
+                  lineHeight: '1.5rem'
+                }}
+              />
+            </Flex>
+
+            <Flex gap="3">
+              <Button
+                radius="full"
+                variant="solid"
+                onClick={() => cacheResult(run(db, lines))}
+              >
+                <PlayIcon size={10} /> run
+              </Button>
+              <Button
+                radius="full"
+                variant="outline"
+                color="red"
+                onClick={() => {
+                  setCode('');
+                  cacheResult(null);
+                }}
+              >
+                <Trash2Icon size={10} /> clear
+              </Button>
+            </Flex>
+
+            {result?.error ? (
+              <Callout.Root mt="4" color="red" role="alert">
+                <Callout.Icon>
+                  <TriangleAlertIcon size="16" />
+                </Callout.Icon>
+                <Callout.Text children={result?.error} />
+              </Callout.Root>
+            ) : null}
+
+            <Flex
+              direction="column"
+              gap="4"
+              mt="4"
+              className={clsx(
+                'transition-opacity',
+                result?.data ? 'opacity-100' : 'opacity-0'
+              )}
+            >
+              <p className="text-xs">
+                Executed {count} rows in {timing} ms
+              </p>
+
+              <Table.Root variant="surface" className="rounded-xs!">
+                <Table.Header>
+                  <Table.Row
+                    children={headers?.map((header, hidx) => (
+                      <Table.ColumnHeaderCell
+                        key={hidx}
+                        children={header}
+                        className="border-r border-r-gray-200 last:border-none"
+                      />
+                    ))}
+                  />
+                </Table.Header>
+                <Table.Body>
+                  {rows?.map((row, ridx) => (
+                    <Table.Row
+                      key={ridx}
+                      className=""
+                      children={row?.map((cell, cidx) =>
+                        cidx === 0 ? (
+                          <Table.RowHeaderCell
+                            key={cidx}
+                            children={cell}
+                            className="border-r border-r-gray-200"
+                          />
+                        ) : (
+                          <Table.Cell
+                            key={cidx}
+                            children={cell}
+                            className="border-r border-r-gray-200 last:border-none"
+                          />
+                        )
+                      )}
+                    />
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </Flex>
+          </Flex>
+        );
+      }
+
+      function App() {
+        return (
+          <Theme accentColor="purple">
+            <Box py="6">
+              <Container size="2">
+                <CustomEditor />
+              </Container>
+            </Box>
+          </Theme>
+        );
+      }
+
+      createRoot(document.getElementById('app')).render(<App />);
+    </script>
+  </body>
+</html>
