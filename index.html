@@ -16,8 +16,8 @@
     <script type="importmap">
       {
         "imports": {
+          "@antonz/sqlean": "https://esm.sh/@antonz/sqlean",
           "@radix-ui/themes": "https://esm.sh/@radix-ui/themes@3.1.6?deps=react@19.2.0,react-dom@19.2.0",
-          "@sqlite.org/sqlite-wasm": "https://esm.sh/@sqlite.org/sqlite-wasm",
           "class-variance-authority": "https://esm.sh/class-variance-authority@0.7.0",
           "clsx": "https://esm.sh/clsx@2.1.0",
           "lucide-react": "https://esm.sh/lucide-react@0.439.0?deps=react@19.2.0,react-dom@19.2.0",
@@ -58,7 +58,7 @@
         TriangleAlertIcon
       } from 'lucide-react';
       import Editor from 'react-simple-code-editor';
-      import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
+      import sqlite3InitModule from '@antonz/sqlean';
       import prism from 'prismjs/components/prism-core';
 
       import 'https://esm.sh/prismjs/components/prism-clike';
@@ -202,7 +202,9 @@
                 onValueChange={setCode}
                 highlight={code => prism.highlight(code, prism.languages.sql)}
                 padding={6}
-                className="flex-1 [&>*]:focus-visible:outline-0"
+                className="flex-1 [&>*]:focus-visible:outline-0 overflow-auto! whitespace-pre h-vh"
+                preClassName="whitespace-pre! break-normal! h-vh"
+                textareaClassName="whitespace-pre! break-normal!"
                 style={{
                   fontFamily: '"Monaspace Neon", Courier, monospace',
                   lineHeight: '1.5rem'
@@ -210,11 +212,17 @@
               />
             </Flex>
 
-            <Flex gap="3">
+            <Flex
+              gap="3"
+              direction={{
+                initial: 'column',
+                sm: 'row'
+              }}
+            >
               <Button
                 radius="full"
                 variant="solid"
-                onClick={() => cacheResult(run(db, lines))}
+                onClick={() => cacheResult(run(db, code))}
               >
                 <PlayIcon size={10} /> run
               </Button>
@@ -297,7 +305,7 @@
       function App() {
         return (
           <Theme accentColor="purple">
-            <Box py="6">
+            <Box p="6">
               <Container size="2">
                 <CustomEditor />
               </Container>
