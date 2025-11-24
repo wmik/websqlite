@@ -11,6 +11,11 @@
 
 - [Sqlime][https://github.com/nalgeon/sqlime]
 
+## Demo
+
+[Live](https://wmik.github.io/websqlite/)
+Try it out and help out to 😊
+
 ## License
 
 © MIT 2025
